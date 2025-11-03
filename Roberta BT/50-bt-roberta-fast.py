@@ -1,5 +1,5 @@
-# RoBERTa with Back-Translation for Sarcasm Detection
-# Optimized for Local GPU Execution
+# RoBERTa WITHOUT Back-Translation for Sarcasm Detection
+# Optimized for Local GPU Execution - FAST VERSION
 
 import pandas as pd
 import numpy as np
@@ -8,7 +8,6 @@ from torch.utils.data import Dataset
 from transformers import RobertaTokenizer, RobertaForSequenceClassification, Trainer, TrainingArguments
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, confusion_matrix, classification_report
 from sklearn.model_selection import train_test_split
-from googletrans import Translator
 from tqdm import tqdm
 import nltk
 import time
@@ -16,7 +15,7 @@ import os
 from datetime import datetime
 
 print("="*60)
-print("RoBERTa with Back-Translation - Sarcasm Detection")
+print("RoBERTa - Sarcasm Detection (NO Back-Translation)")
 print("="*60)
 
 # Download NLTK data
@@ -31,32 +30,11 @@ if torch.cuda.is_available():
     print(f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.2f} GB")
 print("="*60)
 
-print("\n[1/10] Importing libraries and downloading NLTK data")
+print("\n[1/7] Importing libraries and downloading NLTK data")
 print("✓ Libraries imported successfully\n")
 
-# Define back-translation function with retry
-print("[2/10] Defining back-translation function")
-translator = Translator()
-
-def back_translate(text, lang='fr', max_retries=3):
-    """Translate text to another language and back to English for augmentation"""
-    for attempt in range(max_retries):
-        try:
-            translated = translator.translate(text, dest=lang).text
-            time.sleep(0.1)  # Delay to avoid rate limits
-            back_translated = translator.translate(translated, dest='en').text
-            return back_translated
-        except Exception as e:
-            if attempt < max_retries - 1:
-                time.sleep(1)
-            else:
-                return text  # Return original text if all retries fail
-    return text
-
-print("✓ Back-translation function defined\n")
-
 # Load and preprocess dataset
-print("[3/10] Loading and preprocessing dataset")
+print("[2/7] Loading and preprocessing dataset")
 path = 'Datasets/Sarcasm_Headlines_Dataset_v2.json'
 
 df = pd.read_json(path, lines=True)
@@ -73,57 +51,19 @@ print(f"  - Sarcastic: {(df['is_sarcastic']==1).sum()}")
 print(f"  - Non-sarcastic: {(df['is_sarcastic']==0).sum()}\n")
 
 # Sample 50% of the dataset
-print("[4/10] Sampling 50% of the dataset")
+print("[3/7] Sampling 50% of the dataset")
 df = df.sample(frac=0.5, random_state=42).reset_index(drop=True)
 print(f"✓ Sampled dataset: {len(df)} samples")
 print(f"  - Sarcastic: {(df['is_sarcastic']==1).sum()}")
 print(f"  - Non-sarcastic: {(df['is_sarcastic']==0).sum()}\n")
 
-# Augment dataset with back-translation
-print("[5/10] Augmenting dataset with back-translation")
-print("Note: Back-translation is slow. You can skip by pressing Ctrl+C")
-print("Starting augmentation...")
+# Use the dataset without augmentation
+print("[4/7] Skipping augmentation for faster training")
+df_augmented = df.copy()
+print(f"✓ Using original dataset without augmentation")
+print(f"  - Total samples: {len(df_augmented)}\n")
 
-augmented_rows = []
-success_count = 0
-fail_count = 0
-
-try:
-    for idx, row in tqdm(df.iterrows(), total=len(df), desc="Augmenting"):
-        original_text = row['Tweet']
-        augmented_text = back_translate(original_text)
-        if augmented_text != original_text:
-            augmented_rows.append({
-                'Tweet': augmented_text,
-                'Sarcasm (yes/no)': row['Sarcasm (yes/no)'],
-                'is_sarcastic': row['is_sarcastic']
-            })
-            success_count += 1
-        else:
-            fail_count += 1
-        
-        # Optional: Stop after augmenting a certain percentage
-        # Uncomment the next 3 lines to stop at 50% augmentation
-        # if success_count >= len(df) * 0.5:
-        #     print(f"\n✓ Reached 50% augmentation target, stopping early...")
-        #     break
-        
-except KeyboardInterrupt:
-    print("\n\n⚠ Augmentation interrupted by user. Continuing with partial augmentation...")
-
-augmented_df = pd.DataFrame(augmented_rows)
-df_augmented = pd.concat([df, augmented_df], ignore_index=True)
-df_augmented = df_augmented.drop_duplicates(subset=['Tweet'])
-
-print(f"\n✓ Augmentation complete")
-print(f"  - Original samples: {len(df)}")
-print(f"  - Successfully augmented: {success_count}")
-print(f"  - Failed augmentations: {fail_count}")
-print(f"  - Total samples: {len(df_augmented)}")
-print(f"  - Sarcastic: {(df_augmented['is_sarcastic']==1).sum()}")
-print(f"  - Non-sarcastic: {(df_augmented['is_sarcastic']==0).sum()}\n")
-
-df_augmented.to_csv('augmented_data.csv', index=False)
+df_augmented.to_csv('dataset_no_augmentation.csv', index=False)
 
 # Define custom SarcasmDataset class
 class SarcasmDataset(Dataset):
@@ -140,7 +80,7 @@ class SarcasmDataset(Dataset):
         label = item['is_sarcastic']
         encoding = self.tokenizer(
             text,
-            max_length=128,  # Increased from 32 for better context
+            max_length=128,
             padding='max_length',
             truncation=True,
             return_tensors='pt'
@@ -152,7 +92,7 @@ class SarcasmDataset(Dataset):
         }
 
 # Prepare train and eval datasets
-print("[6/10] Preparing train and eval datasets")
+print("[5/7] Preparing train and eval datasets")
 train_df, eval_df = train_test_split(df_augmented, test_size=0.2, random_state=42)
 train_data = train_df.to_dict('records')
 eval_data = eval_df.to_dict('records')
@@ -181,13 +121,13 @@ def compute_metrics(pred):
     }
 
 # Set up TrainingArguments - optimized for local GPU
-print("[7/10] Setting up training configuration")
+print("[6/7] Setting up training configuration")
 training_args = TrainingArguments(
     output_dir='results',
     num_train_epochs=5,
-    per_device_train_batch_size=32,  # Increased for better GPU utilization
-    per_device_eval_batch_size=32,   # Increased for better GPU utilization
-    warmup_steps=500,                 # Reduced for faster training
+    per_device_train_batch_size=32,
+    per_device_eval_batch_size=32,
+    warmup_steps=500,
     weight_decay=0.01,
     logging_dir='logs',
     logging_steps=50,
@@ -196,15 +136,15 @@ training_args = TrainingArguments(
     load_best_model_at_end=True,
     learning_rate=2e-5,
     report_to='none',
-    fp16=torch.cuda.is_available(),  # Use fp16 only if GPU available
-    dataloader_num_workers=4,        # Parallel data loading
+    fp16=torch.cuda.is_available(),
+    dataloader_num_workers=4,
     gradient_accumulation_steps=1,
-    save_total_limit=2,              # Keep only 2 best checkpoints
+    save_total_limit=2,
 )
 print("✓ Training configuration set\n")
 
 # Initialize model and trainer
-print("[8/10] Initializing model and trainer")
+print("[7/7] Initializing model and trainer")
 model = RobertaForSequenceClassification.from_pretrained('roberta-base', num_labels=2)
 model.to(device)
 
@@ -218,7 +158,7 @@ trainer = Trainer(
 print("✓ Model and trainer initialized\n")
 
 # Train the model
-print("[9/10] Training the model")
+print("[8/7] Training the model")
 print("="*60)
 start_time = time.time()
 trainer.train()
@@ -227,11 +167,11 @@ print("="*60)
 print(f"✓ Training completed in {training_time/60:.2f} minutes\n")
 
 # Evaluate the model
-print("[10/10] Evaluating the model and generating results")
+print("[9/7] Evaluating the model and generating results")
 results = trainer.evaluate()
 
 print("\n" + "="*60)
-print("EVALUATION RESULTS")
+print("EVALUATION RESULTS (WITHOUT BACK-TRANSLATION)")
 print("="*60)
 print(f"Accuracy:  {results['eval_accuracy']:.4f}")
 print(f"F1 Score:  {results['eval_f1']:.4f}")
@@ -255,7 +195,7 @@ eval_df_copy['Predicted_Class'] = eval_df_copy['Predicted_Label'].map({0: 'Non-s
 
 # Save predictions to CSV
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-predictions_file = f'predictions_{timestamp}.csv'
+predictions_file = f'predictions_no_bt_{timestamp}.csv'
 eval_df_copy.to_csv(predictions_file, index=False)
 print(f"✓ Detailed predictions saved to: {predictions_file}")
 
@@ -264,7 +204,7 @@ cm = confusion_matrix(true_labels, pred_labels)
 cm_df = pd.DataFrame(cm, 
                      index=['Actual Non-sarcastic', 'Actual Sarcastic'],
                      columns=['Predicted Non-sarcastic', 'Predicted Sarcastic'])
-cm_file = f'confusion_matrix_{timestamp}.csv'
+cm_file = f'confusion_matrix_no_bt_{timestamp}.csv'
 cm_df.to_csv(cm_file)
 print(f"✓ Confusion matrix saved to: {cm_file}")
 
@@ -273,7 +213,7 @@ report = classification_report(true_labels, pred_labels,
                                target_names=['Non-sarcastic', 'Sarcastic'],
                                output_dict=True)
 report_df = pd.DataFrame(report).transpose()
-report_file = f'classification_report_{timestamp}.csv'
+report_file = f'classification_report_no_bt_{timestamp}.csv'
 report_df.to_csv(report_file)
 print(f"✓ Classification report saved to: {report_file}")
 
@@ -281,7 +221,7 @@ print(f"✓ Classification report saved to: {report_file}")
 summary = {
     'Metric': ['Accuracy', 'F1 Score', 'Precision', 'Recall', 'Training Time (min)', 
                'Total Samples', 'Train Samples', 'Test Samples', 
-               'Sarcastic Samples', 'Non-sarcastic Samples'],
+               'Sarcastic Samples', 'Non-sarcastic Samples', 'Augmentation'],
     'Value': [
         f"{results['eval_accuracy']:.4f}",
         f"{results['eval_f1']:.4f}",
@@ -292,11 +232,12 @@ summary = {
         len(train_data),
         len(eval_data),
         (df_augmented['is_sarcastic']==1).sum(),
-        (df_augmented['is_sarcastic']==0).sum()
+        (df_augmented['is_sarcastic']==0).sum(),
+        'None (No Back-Translation)'
     ]
 }
 summary_df = pd.DataFrame(summary)
-summary_file = f'training_summary_{timestamp}.csv'
+summary_file = f'training_summary_no_bt_{timestamp}.csv'
 summary_df.to_csv(summary_file, index=False)
 print(f"✓ Training summary saved to: {summary_file}")
 
@@ -308,5 +249,5 @@ print(f"  1. {predictions_file}")
 print(f"  2. {cm_file}")
 print(f"  3. {report_file}")
 print(f"  4. {summary_file}")
-print(f"  5. augmented_data.csv")
+print(f"  5. dataset_no_augmentation.csv")
 print("="*60)
