@@ -81,35 +81,17 @@ print(f"  - Non-sarcastic: {(df['is_sarcastic']==0).sum()}\n")
 
 # Augment dataset with back-translation
 print("[5/10] Augmenting dataset with back-translation")
-print("Note: Back-translation is slow. You can skip by pressing Ctrl+C")
-print("Starting augmentation...")
-
+print("This may take a while...")
 augmented_rows = []
-success_count = 0
-fail_count = 0
-
-try:
-    for idx, row in tqdm(df.iterrows(), total=len(df), desc="Augmenting"):
-        original_text = row['Tweet']
-        augmented_text = back_translate(original_text)
-        if augmented_text != original_text:
-            augmented_rows.append({
-                'Tweet': augmented_text,
-                'Sarcasm (yes/no)': row['Sarcasm (yes/no)'],
-                'is_sarcastic': row['is_sarcastic']
-            })
-            success_count += 1
-        else:
-            fail_count += 1
-        
-        # Optional: Stop after augmenting a certain percentage
-        # Uncomment the next 3 lines to stop at 50% augmentation
-        # if success_count >= len(df) * 0.5:
-        #     print(f"\n✓ Reached 50% augmentation target, stopping early...")
-        #     break
-        
-except KeyboardInterrupt:
-    print("\n\n⚠ Augmentation interrupted by user. Continuing with partial augmentation...")
+for _, row in tqdm(df.iterrows(), total=len(df), desc="Augmenting"):
+    original_text = row['Tweet']
+    augmented_text = back_translate(original_text)
+    if augmented_text != original_text:
+        augmented_rows.append({
+            'Tweet': augmented_text,
+            'Sarcasm (yes/no)': row['Sarcasm (yes/no)'],
+            'is_sarcastic': row['is_sarcastic']
+        })
 
 augmented_df = pd.DataFrame(augmented_rows)
 df_augmented = pd.concat([df, augmented_df], ignore_index=True)
@@ -117,8 +99,7 @@ df_augmented = df_augmented.drop_duplicates(subset=['Tweet'])
 
 print(f"\n✓ Augmentation complete")
 print(f"  - Original samples: {len(df)}")
-print(f"  - Successfully augmented: {success_count}")
-print(f"  - Failed augmentations: {fail_count}")
+print(f"  - Augmented samples: {len(augmented_df)}")
 print(f"  - Total samples: {len(df_augmented)}")
 print(f"  - Sarcastic: {(df_augmented['is_sarcastic']==1).sum()}")
 print(f"  - Non-sarcastic: {(df_augmented['is_sarcastic']==0).sum()}\n")
