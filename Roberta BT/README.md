@@ -45,14 +45,48 @@ All outputs are saved with timestamps to avoid overwriting:
 5. **augmented_data.csv**
    - Complete augmented dataset used for training
 
-## Requirements
+## Installation
+
+### Option 1: Automated Installation (Recommended)
+```bash
+# Run the installation script
+./install.sh
+```
+
+### Option 2: Manual Installation
+```bash
+# Create virtual environment
+python3 -m venv .venv
+
+# Activate virtual environment
+source .venv/bin/activate  # On macOS/Linux
+# OR
+.venv\Scripts\activate     # On Windows
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### Option 3: Direct pip install
 ```bash
 pip install pandas numpy torch transformers scikit-learn nltk googletrans==3.1.0a0 tqdm
 ```
 
 ## Usage
+
+### With Virtual Environment (Recommended)
 ```bash
+# Activate virtual environment
+source .venv/bin/activate
+
+# Run the script
 python 50-bt-roberta.py
+```
+
+### Direct Execution
+```bash
+# Run directly with virtual environment Python
+.venv/bin/python 50-bt-roberta.py
 ```
 
 ## Training Configuration
