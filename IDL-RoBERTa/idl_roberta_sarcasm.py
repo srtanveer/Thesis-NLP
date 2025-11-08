@@ -63,7 +63,15 @@ import nltk
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
-from transformers import RobertaTokenizer, RobertaPreTrainedModel, RobertaModel, Trainer, TrainingArguments
+from transformers import (
+    RobertaTokenizer, 
+    RobertaModel, 
+    Trainer, 
+    TrainingArguments,
+    RobertaConfig,
+    RobertaPreTrainedModel
+)
+from transformers.modeling_outputs import SequenceClassifierOutput
 from sklearn.metrics import accuracy_score, f1_score, classification_report
 from sklearn.model_selection import train_test_split
 from collections import defaultdict
