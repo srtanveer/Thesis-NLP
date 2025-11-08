@@ -4,6 +4,44 @@ IDL-RoBERTa for Sarcasm Detection on Sarcasm Headlines Dataset
 Enhanced Model with Commonsense Incongruity Features
 """
 
+# Install/upgrade required packages
+import subprocess
+import sys
+
+def install_requirements():
+    """Install required packages if not available"""
+    packages = [
+        'accelerate>=0.26.0',
+        'transformers>=4.30.0',
+        'torch',
+        'pandas',
+        'numpy',
+        'scikit-learn',
+        'nltk',
+        'tqdm'
+    ]
+    
+    print("=" * 70)
+    print("📦 CHECKING AND INSTALLING REQUIRED PACKAGES")
+    print("=" * 70)
+    
+    for package in packages:
+        try:
+            print(f"Installing/upgrading {package}...")
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "--upgrade", package])
+            print(f"✅ {package} ready")
+        except Exception as e:
+            print(f"⚠️  Warning installing {package}: {e}")
+    
+    print("✅ All packages checked\n")
+
+# Run installation
+try:
+    install_requirements()
+except Exception as e:
+    print(f"⚠️  Package installation had issues: {e}")
+    print("Continuing anyway...\n")
+
 # Suppress TensorFlow and other warnings
 import os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
@@ -14,7 +52,6 @@ import warnings
 warnings.filterwarnings("ignore")
 
 # Disable symlink warnings on Windows
-import sys
 if sys.platform == "win32":
     warnings.filterwarnings("ignore", category=UserWarning, module="huggingface_hub.file_download")
 
