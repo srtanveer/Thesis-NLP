@@ -105,11 +105,6 @@ check_disk_space()
 
 # =============================================================================
 # 1. LOAD SARCASM HEADLINES DATASET
-    print(f"CUDA version: {torch.version.cuda}")
-    print(f"GPU memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.2f} GB")
-
-# =============================================================================
-# 1. LOAD SARCASM HEADLINES DATASET
 # =============================================================================
 print("\n" + "="*70)
 print("📂 LOADING SARCASM HEADLINES DATASET")
