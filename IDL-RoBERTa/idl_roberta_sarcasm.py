@@ -44,6 +44,7 @@ except Exception as e:
 
 # Suppress TensorFlow and other warnings
 import os
+import shutil
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
@@ -505,11 +506,13 @@ training_args = TrainingArguments(
     report_to='none',
     fp16=torch.cuda.is_available(),  # Only use fp16 if CUDA is available
     gradient_accumulation_steps=2,  # Effective batch size: 32
-    save_total_limit=2,
+    save_total_limit=1,  # Reduced from 2 to save disk space
     dataloader_num_workers=0,  # Prevent multiprocessing issues
     disable_tqdm=False,
     logging_first_step=True,
     seed=42,
+    save_safetensors=False,  # Use legacy format to save space
+    save_only_model=True,  # Don't save optimizer states
 )
 
 print(f"✅ Output directory: {output_dir}")
@@ -562,6 +565,47 @@ except Exception as e:
 print("\n" + "="*70)
 print("🚀 STARTING TRAINING")
 print("="*70)
+
+# Clean up cache before training to free disk space
+print("\n🧹 Cleaning cache to free disk space...")
+try:
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    # Clear old checkpoints if they exist
+    if os.path.exists(output_dir):
+        checkpoints = [d for d in os.listdir(output_dir) if d.startswith('checkpoint-')]
+        for cp in checkpoints:
+            cp_path = os.path.join(output_dir, cp)
+            if os.path.isdir(cp_path):
+                shutil.rmtree(cp_path)
+                print(f"   Removed old checkpoint: {cp}")
+    print("✅ Cleanup complete")
+except Exception as e:
+    print(f"⚠️  Cleanup warning: {e}")
+
+# Check disk space
+def check_disk_space(path='/'):
+    """Check available disk space"""
+    try:
+        stat = shutil.disk_usage(path)
+        free_gb = stat.free / (1024**3)
+        total_gb = stat.total / (1024**3)
+        used_percent = (stat.used / stat.total) * 100
+        print(f"\n💾 Disk Space:")
+        print(f"   Total: {total_gb:.2f} GB")
+        print(f"   Free: {free_gb:.2f} GB")
+        print(f"   Used: {used_percent:.1f}%")
+        
+        if free_gb < 5:
+            print(f"\n⚠️  WARNING: Low disk space ({free_gb:.2f} GB free)")
+            print(f"   Training may fail. Recommended: >10 GB free")
+            return False
+        return True
+    except Exception as e:
+        print(f"Could not check disk space: {e}")
+        return True
+
+check_disk_space()
 
 # Train with error handling and checkpointing
 try:
